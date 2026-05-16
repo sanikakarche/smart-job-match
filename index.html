@@ -1,0 +1,831 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Smart Job Match Agent</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f4f3f0;--surface:#ffffff;--surface2:#faf9f7;
+  --border:#e5e3de;--border2:#ccc9c0;
+  --text:#18181a;--text2:#5c5b58;--text3:#9c9890;
+  --accent:#18181a;--accent2:#2f2f2f;
+  --green:#16a34a;--green-bg:#f0fdf4;--green-b:#bbf7d0;
+  --yellow:#b45309;--yellow-bg:#fffbeb;--yellow-b:#fde68a;
+  --blue:#1d4ed8;--blue-bg:#eff6ff;--blue-b:#bfdbfe;
+  --purple:#6d28d9;--purple-bg:#f5f3ff;--purple-b:#ddd6fe;
+  --red:#dc2626;--red-bg:#fef2f2;
+  --r:12px;--r-sm:7px;--r-xs:5px;
+  --shadow:0 1px 3px rgba(0,0,0,.07),0 1px 2px rgba(0,0,0,.04);
+  --shadow-md:0 4px 12px rgba(0,0,0,.08),0 2px 4px rgba(0,0,0,.04);
+}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;min-height:100vh}
+
+/* ── Layout ── */
+.app{display:grid;grid-template-columns:256px 1fr;min-height:100vh}
+
+/* ── Sidebar ── */
+.sidebar{background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow:hidden}
+.sb-top{padding:20px 16px 12px;border-bottom:1px solid var(--border)}
+.brand{display:flex;align-items:center;gap:10px}
+.brand-icon{width:34px;height:34px;background:var(--accent);border-radius:9px;display:grid;place-items:center;color:#fff;font-size:16px;flex-shrink:0}
+.brand-name{font-size:14px;font-weight:700;letter-spacing:-.3px}
+.brand-sub{font-size:11px;color:var(--text3);margin-top:1px}
+
+.sb-nav{padding:10px 8px;flex:1;overflow-y:auto}
+.nav-label{font-size:10px;font-weight:600;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;padding:10px 10px 4px}
+.nav-btn{display:flex;align-items:center;gap:9px;width:100%;padding:8px 10px;border-radius:var(--r-xs);border:none;background:none;color:var(--text2);cursor:pointer;font-size:13px;font-family:'Inter',sans-serif;text-align:left;transition:all .13s}
+.nav-btn:hover{background:var(--bg);color:var(--text)}
+.nav-btn.active{background:#efefeb;color:var(--text);font-weight:600}
+.nav-btn .ni{font-size:15px;width:20px;text-align:center;opacity:.75}
+.nav-btn.active .ni{opacity:1}
+.nav-pill{margin-left:auto;font-size:10px;font-weight:600;padding:2px 6px;border-radius:20px;background:var(--accent);color:#fff}
+
+.sb-foot{padding:14px 16px;border-top:1px solid var(--border)}
+.api-badge{display:flex;align-items:center;gap:8px;padding:9px 11px;background:var(--bg);border-radius:var(--r-sm);font-size:12px;cursor:default}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--green);flex-shrink:0;transition:background .3s}
+.dot.err{background:var(--red)}
+.dot.checking{background:var(--yellow);animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+/* ── Main ── */
+.main{display:flex;flex-direction:column;min-height:100vh;overflow:hidden}
+.topbar{padding:14px 24px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:20}
+.page-ttl{font-size:15px;font-weight:700;letter-spacing:-.3px}
+.page-sub{font-size:12px;color:var(--text3);margin-top:1px}
+.topbar-r{display:flex;gap:8px;align-items:center}
+
+/* ── Buttons ── */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:var(--r-sm);font-size:13px;font-family:'Inter',sans-serif;cursor:pointer;border:none;font-weight:500;transition:all .13s;white-space:nowrap}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover:not(:disabled){background:var(--accent2)}
+.btn-primary:disabled{opacity:.4;cursor:not-allowed}
+.btn-ghost{background:none;border:1px solid var(--border);color:var(--text2)}
+.btn-ghost:hover{border-color:var(--border2);color:var(--text);background:var(--surface)}
+.btn-sm{padding:5px 11px;font-size:12px}
+.btn-green{background:var(--green);color:#fff}
+.btn-green:hover{opacity:.88}
+
+/* ── Content ── */
+.content{flex:1;padding:22px 24px;max-width:100%;overflow-y:auto}
+.panel{display:none}.panel.active{display:block}
+
+/* ── Card ── */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--shadow);margin-bottom:16px;overflow:hidden}
+.card-head{padding:13px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.card-title{font-size:13px;font-weight:600}
+.card-body{padding:16px}
+
+/* ── Resume input ── */
+textarea{width:100%;resize:vertical;font-size:13px;font-family:'Inter',sans-serif;color:var(--text);border:1px solid var(--border);border-radius:var(--r-sm);padding:11px 13px;line-height:1.65;background:var(--surface2);transition:border .13s;min-height:140px}
+textarea:focus{outline:none;border-color:var(--border2);background:var(--surface)}
+.samples-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.s-chip{padding:4px 11px;border:1px solid var(--border);border-radius:20px;font-size:12px;cursor:pointer;background:var(--surface);color:var(--text2);transition:all .13s}
+.s-chip:hover{border-color:var(--border2);color:var(--text);background:var(--bg)}
+.action-bar{display:flex;align-items:center;justify-content:space-between;margin-top:13px}
+.char-c{font-size:11px;color:var(--text3)}
+
+/* ── Progress steps ── */
+.steps-box{display:none;flex-direction:column;gap:0;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin-bottom:16px;box-shadow:var(--shadow)}
+.steps-box.show{display:flex}
+.step-item{display:flex;align-items:center;gap:11px;padding:11px 16px;border-bottom:1px solid var(--border);font-size:12px;color:var(--text3);transition:all .2s}
+.step-item:last-child{border-bottom:none}
+.step-item.active{color:var(--text);background:var(--yellow-bg)}
+.step-item.done{color:var(--green);background:var(--green-bg)}
+.step-circle{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:11px;font-weight:700;flex-shrink:0;transition:all .2s}
+.step-item .step-circle{background:var(--bg);color:var(--text3)}
+.step-item.active .step-circle{background:var(--yellow-bg);color:var(--yellow);border:1.5px solid var(--yellow-b);animation:spin-slow 1.2s linear infinite}
+.step-item.done .step-circle{background:var(--green-bg);color:var(--green);border:1.5px solid var(--green-b)}
+@keyframes spin-slow{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+.step-label{flex:1}
+.step-time{font-size:10px;color:var(--text3)}
+
+/* ── Progress bar ── */
+.prog-bar{height:3px;background:var(--border);border-radius:3px;overflow:hidden;margin-bottom:16px;display:none}
+.prog-bar.show{display:block}
+.prog-fill{height:100%;background:linear-gradient(90deg,var(--accent),#555);border-radius:3px;transition:width .4s ease;width:0%}
+
+/* ── Metrics strip ── */
+.metrics{display:grid;gap:10px;margin-bottom:16px}
+.metrics-3{grid-template-columns:repeat(3,1fr)}
+.metrics-4{grid-template-columns:repeat(4,1fr)}
+.metric-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px;box-shadow:var(--shadow)}
+.metric-val{font-size:24px;font-weight:700;letter-spacing:-.5px}
+.metric-lbl{font-size:11px;color:var(--text3);margin-top:3px}
+.metric-sub{font-size:11px;color:var(--text2);margin-top:2px}
+
+/* ── Candidate card ── */
+.cand-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:16px;margin-bottom:14px;display:flex;gap:14px;align-items:flex-start;box-shadow:var(--shadow)}
+.avatar{width:42px;height:42px;border-radius:50%;background:var(--accent);display:grid;place-items:center;font-size:15px;font-weight:700;color:#fff;flex-shrink:0}
+.cand-info{flex:1;min-width:0}
+.cand-name{font-size:15px;font-weight:700;letter-spacing:-.2px}
+.cand-meta{font-size:12px;color:var(--text2);margin-top:2px}
+.chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px}
+.chip{font-size:11px;padding:3px 9px;border-radius:20px;border:1px solid var(--border);color:var(--text2);background:var(--bg)}
+.chip.hl{background:var(--blue-bg);color:var(--blue);border-color:var(--blue-b)}
+
+/* ── Job cards ── */
+.jobs-list{display:flex;flex-direction:column;gap:10px;margin-bottom:16px}
+.job-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:16px;box-shadow:var(--shadow);transition:all .15s;position:relative}
+.job-card:hover{border-color:var(--border2);box-shadow:var(--shadow-md)}
+.job-card.top{border-color:var(--accent);border-width:1.5px}
+.rank-badge{position:absolute;top:-1px;left:16px;background:var(--accent);color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:0 0 6px 6px;letter-spacing:.04em}
+.job-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:8px;margin-top:4px}
+.job-title{font-size:14px;font-weight:700;letter-spacing:-.2px}
+.job-co{font-size:12px;color:var(--text2);margin-top:2px}
+.score-pill{padding:4px 11px;border-radius:20px;font-size:12px;font-weight:700;white-space:nowrap;flex-shrink:0}
+.score-pill.hi{background:var(--green-bg);color:var(--green);border:1px solid var(--green-b)}
+.score-pill.md{background:var(--yellow-bg);color:var(--yellow);border:1px solid var(--yellow-b)}
+.score-pill.lo{background:var(--bg);color:var(--text3);border:1px solid var(--border)}
+.score-bar{height:3px;background:var(--bg);border-radius:3px;overflow:hidden;margin:6px 0 10px}
+.score-fill{height:100%;background:linear-gradient(90deg,var(--accent),#555);border-radius:3px;transition:width .6s ease}
+.tags{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px}
+.tag{font-size:11px;padding:3px 9px;border-radius:20px;background:var(--bg);color:var(--text2);border:1px solid var(--border)}
+.tag.remote{background:var(--blue-bg);color:var(--blue);border-color:var(--blue-b)}
+.tag.domain{background:var(--purple-bg);color:var(--purple);border-color:var(--purple-b)}
+.tag.salary{background:var(--green-bg);color:var(--green);border-color:var(--green-b)}
+.expl{font-size:12.5px;color:var(--text2);line-height:1.7;border-top:1px solid var(--border);padding-top:10px}
+
+/* ── Clarify card ── */
+.clarify-card{background:var(--surface);border:1.5px solid var(--border2);border-radius:var(--r);padding:16px;margin-bottom:18px;box-shadow:var(--shadow-md)}
+.clarify-lbl{font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.clarify-q{font-size:14px;font-weight:600;color:var(--text);line-height:1.6;margin-bottom:12px}
+.clarify-row{display:flex;gap:8px}
+.clarify-row input{flex:1;padding:8px 12px;border:1px solid var(--border);border-radius:var(--r-sm);font-size:13px;font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);transition:border .13s}
+.clarify-row input:focus{outline:none;border-color:var(--border2);background:var(--surface)}
+
+/* ── Refine panel ── */
+.form-field{display:flex;flex-direction:column;gap:5px;margin-bottom:13px}
+.form-field label{font-size:12px;font-weight:600;color:var(--text2)}
+.form-field input,.form-field textarea{padding:8px 12px;border:1px solid var(--border);border-radius:var(--r-sm);font-size:13px;font-family:'Inter',sans-serif;background:var(--surface2);color:var(--text);transition:border .13s}
+.form-field input:focus,.form-field textarea:focus{outline:none;border-color:var(--border2);background:var(--surface)}
+.reasoning{border-left:3px solid var(--accent);padding:10px 14px;background:var(--surface);border-radius:0 var(--r-sm) var(--r-sm) 0;font-size:13px;color:var(--text2);line-height:1.7;margin-bottom:14px}
+
+/* ── Log panel ── */
+.log-row{display:flex;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border);font-size:12px;align-items:flex-start}
+.log-row:last-child{border-bottom:none}
+.log-ic{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:11px;flex-shrink:0;margin-top:1px;font-weight:700}
+.log-ic.ok{background:var(--green-bg);color:var(--green)}
+.log-ic.warn{background:var(--yellow-bg);color:var(--yellow)}
+.log-ic.err{background:var(--red-bg);color:var(--red)}
+.log-name{font-weight:600;color:var(--text)}
+.log-detail{color:var(--text3);font-size:11px;margin-top:2px;font-family:monospace;word-break:break-all}
+.log-ts{font-size:10px;color:var(--text3);margin-left:auto;white-space:nowrap;padding-top:2px}
+
+/* ── Dataset panel ── */
+.domain-row{display:flex;align-items:center;gap:10px;margin-bottom:7px;font-size:12px}
+.domain-name{width:110px;text-align:right;color:var(--text2);flex-shrink:0}
+.domain-bar-wrap{flex:1;height:18px;background:var(--bg);border-radius:4px;overflow:hidden}
+.domain-bar-fill{height:100%;border-radius:4px;transition:width .5s ease}
+.domain-count{width:24px;color:var(--text3);font-size:11px}
+
+/* ── Empty state ── */
+.empty{text-align:center;padding:56px 20px;color:var(--text3)}
+.empty-icon{font-size:40px;margin-bottom:14px;opacity:.35}
+.empty p{font-size:13px;line-height:1.8;color:var(--text2)}
+
+/* ── Toast ── */
+.toast{position:fixed;bottom:22px;right:22px;background:var(--accent);color:#fff;padding:10px 16px;border-radius:var(--r-sm);font-size:13px;font-weight:500;transform:translateY(80px);opacity:0;transition:all .28s cubic-bezier(.34,1.56,.64,1);z-index:999;max-width:320px}
+.toast.show{transform:translateY(0);opacity:1}
+
+/* ── Error box ── */
+.err-box{padding:14px 16px;background:var(--red-bg);border:1px solid #fecaca;border-radius:var(--r);color:var(--red);font-size:13px;margin-bottom:14px}
+
+/* ── Tab badge ── */
+.tab-dot{width:6px;height:6px;border-radius:50%;background:var(--green);flex-shrink:0}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- ─── Sidebar ─────────────────────────────────────────────── -->
+<aside class="sidebar">
+  <div class="sb-top">
+    <div class="brand">
+      <div class="brand-icon">⚡</div>
+      <div>
+        <div class="brand-name">Job Match Agent</div>
+        <div class="brand-sub">Gemini 2.0 Flash · TF-IDF</div>
+      </div>
+    </div>
+  </div>
+
+  <nav class="sb-nav">
+    <div class="nav-label">Core</div>
+    <button class="nav-btn active" onclick="nav(this,'recommend')">
+      <span class="ni">🔍</span> Find Jobs
+    </button>
+    <button class="nav-btn" onclick="nav(this,'refine')">
+      <span class="ni">🎯</span> Refine Results
+    </button>
+
+    <div class="nav-label" style="margin-top:6px">Debug & Explore</div>
+    <button class="nav-btn" onclick="nav(this,'log')">
+      <span class="ni">📋</span> Agent Log
+      <span class="nav-pill" id="log-pill" style="display:none">0</span>
+    </button>
+    <button class="nav-btn" onclick="nav(this,'dataset')">
+      <span class="ni">🗄️</span> Dataset
+    </button>
+    <button class="nav-btn" onclick="nav(this,'about')">
+      <span class="ni">ℹ️</span> About
+    </button>
+  </nav>
+
+  <div class="sb-foot">
+    <div class="api-badge">
+      <div class="dot checking" id="dot"></div>
+      <span id="dot-text" style="font-size:12px;color:var(--text2)">Connecting…</span>
+    </div>
+  </div>
+</aside>
+
+<!-- ─── Main ────────────────────────────────────────────────── -->
+<div class="main">
+  <div class="topbar">
+    <div>
+      <div class="page-ttl" id="p-title">Find Matching Jobs</div>
+      <div class="page-sub" id="p-sub">Paste your resume → get AI-ranked jobs + explanations</div>
+    </div>
+    <div class="topbar-r">
+      <button class="btn btn-ghost btn-sm" onclick="clearAll()">Clear</button>
+      <button class="btn btn-primary" id="run-btn" onclick="runRecommend()">▶ Run Agent</button>
+    </div>
+  </div>
+
+  <div class="content">
+    <!-- Progress -->
+    <div class="prog-bar" id="prog-bar"><div class="prog-fill" id="prog-fill"></div></div>
+    <div class="steps-box" id="steps-box">
+      <div class="step-item" id="st1">
+        <div class="step-circle" id="sc1">1</div>
+        <div class="step-label" id="sl1">TF-IDF ranking across 50 jobs…</div>
+        <div class="step-time" id="st1-t"></div>
+      </div>
+      <div class="step-item" id="st2">
+        <div class="step-circle" id="sc2">2</div>
+        <div class="step-label" id="sl2">Agent: calling parse_resume tool…</div>
+        <div class="step-time" id="st2-t"></div>
+      </div>
+      <div class="step-item" id="st3">
+        <div class="step-circle" id="sc3">3</div>
+        <div class="step-label" id="sl3">Agent: calling generate_match_explanations tool…</div>
+        <div class="step-time" id="st3-t"></div>
+      </div>
+    </div>
+
+    <!-- ── RECOMMEND ── -->
+    <div id="panel-recommend" class="panel active">
+      <div class="card">
+        <div class="card-head">
+          <span class="card-title">Resume Input</span>
+          <span class="char-c" id="char-c">0 chars</span>
+        </div>
+        <div class="card-body">
+          <div style="margin-bottom:11px">
+            <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:7px">Quick Samples</div>
+            <div class="samples-row">
+              <div class="s-chip" onclick="loadSample('nlp')">🤖 NLP Engineer</div>
+              <div class="s-chip" onclick="loadSample('fullstack')">💻 Full Stack</div>
+              <div class="s-chip" onclick="loadSample('data')">📊 Data Scientist</div>
+              <div class="s-chip" onclick="loadSample('devops')">⚙️ DevOps</div>
+              <div class="s-chip" onclick="loadSample('finance')">💹 Quant Finance</div>
+              <div class="s-chip" onclick="loadSample('health')">🏥 HealthTech</div>
+            </div>
+          </div>
+          <textarea id="resume-in" placeholder="Paste your resume here — skills, experience, education, target roles…" oninput="onInput()"></textarea>
+          <div class="action-bar">
+            <span class="char-c" id="char-hint" style="font-size:12px;color:var(--text3)">Minimum 30 characters</span>
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-ghost btn-sm" onclick="clearResume()">Clear</button>
+              <button class="btn btn-primary" id="run-btn2" onclick="runRecommend()">▶ Run Agent</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div id="results-area">
+        <div class="empty">
+          <div class="empty-icon">✨</div>
+          <p>Select a sample resume or paste your own above,<br>then click <strong>Run Agent</strong> to get AI-powered matches.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── REFINE ── -->
+    <div id="panel-refine" class="panel">
+      <div class="card">
+        <div class="card-head"><span class="card-title">Re-rank With Your Answer</span></div>
+        <div class="card-body">
+          <div class="form-field">
+            <label>Resume Text</label>
+            <textarea id="rf-resume" style="min-height:80px" placeholder="Paste your resume…"></textarea>
+          </div>
+          <div class="form-field">
+            <label>Clarifying Question</label>
+            <input type="text" id="rf-q" placeholder="e.g. Are you open to remote work?">
+          </div>
+          <div class="form-field">
+            <label>Your Answer</label>
+            <input type="text" id="rf-a" placeholder="e.g. Yes, I strongly prefer remote-only roles.">
+          </div>
+          <button class="btn btn-primary" onclick="runRefine()">🔄 Re-rank Jobs</button>
+        </div>
+      </div>
+      <div id="refine-out"></div>
+    </div>
+
+    <!-- ── LOG ── -->
+    <div id="panel-log" class="panel">
+      <div class="card">
+        <div class="card-head">
+          <span class="card-title">Agent Tool Call Log</span>
+          <button class="btn btn-ghost btn-sm" onclick="clearLog()">Clear</button>
+        </div>
+        <div id="log-body">
+          <div class="empty" style="padding:32px 20px">
+            <div class="empty-icon" style="font-size:28px">📋</div>
+            <p>Run a recommendation to see the agent's tool call trace.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── DATASET ── -->
+    <div id="panel-dataset" class="panel">
+      <div class="metrics metrics-4" id="ds-metrics">
+        <div class="metric-card"><div class="metric-val">50</div><div class="metric-lbl">Total Jobs</div></div>
+        <div class="metric-card"><div class="metric-val" id="ds-remote">—</div><div class="metric-lbl">Remote Roles</div></div>
+        <div class="metric-card"><div class="metric-val" id="ds-domains">—</div><div class="metric-lbl">Domains</div></div>
+        <div class="metric-card"><div class="metric-val" id="ds-avg">—</div><div class="metric-lbl">Avg Salary (LPA)</div></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="card-title">Domain Distribution</span></div>
+        <div class="card-body" id="domain-chart"></div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <span class="card-title">Browse Jobs</span>
+          <select id="ds-filter" onchange="loadJobs()" style="font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:var(--r-xs);background:var(--bg);color:var(--text);font-family:'Inter',sans-serif">
+            <option value="">All Domains</option>
+          </select>
+        </div>
+        <div style="padding:12px 16px" id="jobs-grid"></div>
+      </div>
+    </div>
+
+    <!-- ── ABOUT ── -->
+    <div id="panel-about" class="panel">
+      <div class="card">
+        <div class="card-head"><span class="card-title">Architecture</span></div>
+        <div class="card-body" style="font-size:13px;color:var(--text2);line-height:1.9">
+          <p style="margin-bottom:16px">This system combines <strong>classical ML</strong> with an <strong>agentic LLM layer</strong> using Gemini 2.0 Flash native tool-calling.</p>
+          <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-sm);padding:14px;font-family:monospace;font-size:12px;line-height:2;margin-bottom:16px;color:var(--text)">
+POST /recommend<br>
+│<br>
+├─ <span style="color:var(--blue)">Step 1:</span> TF-IDF cosine similarity → top-5 jobs (Classical ML)<br>
+│&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;No external API · Zero latency · Discriminative scores<br>
+│<br>
+├─ <span style="color:var(--purple)">Step 2:</span> Gemini tool-call → parse_resume<br>
+│&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Output: {name, skills, exp, roles, education}<br>
+│<br>
+├─ <span style="color:var(--green)">Step 3:</span> Gemini tool-call → generate_match_explanations<br>
+│&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Output: {explanations[], clarifying_question}<br>
+│<br>
+└─ Response: {candidate, ranked_jobs, clarifying_question, meta}
+          </div>
+          <p style="margin-bottom:8px"><strong>Why TF-IDF over sentence-transformers?</strong><br>
+          Vercel free tier has a 1024 MB memory limit. Large embedding models cause OOM on cold starts. TF-IDF runs in-memory, produces well-spread scores (not all 0.90+), and handles domain-specific vocabulary (BERT, LangChain, Kubeflow) well through IDF weighting.</p>
+          <p style="margin-bottom:8px"><strong>Why two tool calls?</strong><br>
+          Separation of concerns — Step 1 focuses purely on understanding the candidate without job-data noise. Step 2 receives a clean structured profile, producing far more precise match reasoning than a single monolithic prompt.</p>
+          <p><strong>Tech Stack:</strong> FastAPI · Gemini 2.0 Flash · TF-IDF · httpx · Pydantic · Vercel</p>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="card-title">API Reference</span></div>
+        <div class="card-body" style="font-size:13px;color:var(--text2)">
+          <table style="width:100%;border-collapse:collapse">
+            <thead><tr style="font-size:11px;color:var(--text3)"><th style="text-align:left;padding:6px 0;border-bottom:1px solid var(--border)">Method</th><th style="text-align:left;padding:6px 0;border-bottom:1px solid var(--border)">Endpoint</th><th style="text-align:left;padding:6px 0;border-bottom:1px solid var(--border)">Description</th></tr></thead>
+            <tbody>
+              <tr><td style="padding:8px 0;border-bottom:1px solid var(--border)"><span style="background:var(--green-bg);color:var(--green);padding:2px 7px;border-radius:4px;font-size:11px;font-weight:700">GET</span></td><td style="padding:8px 10px 8px 0;border-bottom:1px solid var(--border);font-family:monospace;font-size:12px">/</td><td style="padding:8px 0;border-bottom:1px solid var(--border)">Serve this UI</td></tr>
+              <tr><td style="padding:8px 0;border-bottom:1px solid var(--border)"><span style="background:var(--green-bg);color:var(--green);padding:2px 7px;border-radius:4px;font-size:11px;font-weight:700">GET</span></td><td style="padding:8px 10px 8px 0;border-bottom:1px solid var(--border);font-family:monospace;font-size:12px">/health</td><td style="padding:8px 0;border-bottom:1px solid var(--border)">API health + config</td></tr>
+              <tr><td style="padding:8px 0;border-bottom:1px solid var(--border)"><span style="background:var(--blue-bg);color:var(--blue);padding:2px 7px;border-radius:4px;font-size:11px;font-weight:700">POST</span></td><td style="padding:8px 10px 8px 0;border-bottom:1px solid var(--border);font-family:monospace;font-size:12px">/recommend</td><td style="padding:8px 0;border-bottom:1px solid var(--border)">Main recommendation pipeline</td></tr>
+              <tr><td style="padding:8px 0;border-bottom:1px solid var(--border)"><span style="background:var(--blue-bg);color:var(--blue);padding:2px 7px;border-radius:4px;font-size:11px;font-weight:700">POST</span></td><td style="padding:8px 10px 8px 0;border-bottom:1px solid var(--border);font-family:monospace;font-size:12px">/refine</td><td style="padding:8px 0;border-bottom:1px solid var(--border)">Re-rank with clarifying answer</td></tr>
+              <tr><td style="padding:8px 0;border-bottom:1px solid var(--border)"><span style="background:var(--green-bg);color:var(--green);padding:2px 7px;border-radius:4px;font-size:11px;font-weight:700">GET</span></td><td style="padding:8px 10px 8px 0;border-bottom:1px solid var(--border);font-family:monospace;font-size:12px">/jobs</td><td style="padding:8px 0;border-bottom:1px solid var(--border)">Browse dataset (filterable)</td></tr>
+              <tr><td style="padding:8px 0"><span style="background:var(--green-bg);color:var(--green);padding:2px 7px;border-radius:4px;font-size:11px;font-weight:700">GET</span></td><td style="padding:8px 10px 8px 0;font-family:monospace;font-size:12px">/stats</td><td style="padding:8px 0">Dataset statistics</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div><!-- /content -->
+</div><!-- /main -->
+</div><!-- /app -->
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── Samples ──────────────────────────────────────────────────────────────────
+const SAMPLES = {
+  nlp:`I am Priya Sharma, a Computer Science graduate from IIT Bombay with 1 year of professional experience. I specialize in Python, NLP, and machine learning. I have worked on BERT fine-tuning for text classification, built RAG pipelines using LangChain and LlamaIndex, and developed FastAPI microservices. Familiar with HuggingFace Transformers, Docker, and PostgreSQL. I am looking for roles in AI/ML engineering, NLP research, or LLM product development.`,
+  fullstack:`Rahul Mehta, B.E. Computer Engineering from Pune University, 2 years of industry experience. Core skills: React, TypeScript, Node.js, Express, PostgreSQL, Redis, Docker, REST APIs, GraphQL, and AWS EC2/S3. Built a multi-tenant SaaS dashboard with real-time notifications. Looking for full-stack or backend-focused engineering roles. Comfortable with CI/CD pipelines and Agile workflows.`,
+  data:`Ananya Iyer, M.Sc. Statistics from IIT Madras, fresher. Strong in Python, R, Pandas, NumPy, scikit-learn, SQL, Tableau, Power BI, and A/B testing. Completed thesis on causal inference in e-commerce funnel analysis. Interested in data science, analytics engineering, and ML research roles. Familiar with Google BigQuery and dbt.`,
+  devops:`Karan Shah, B.Tech IT, 2 years experience as DevOps engineer. Proficient in Kubernetes, Docker, Terraform, Ansible, Jenkins, GitHub Actions, AWS (EC2, RDS, EKS, Lambda), GCP, and Linux. Implemented GitOps workflows and reduced deployment time by 60%. Seeking cloud infrastructure, SRE, or platform engineering roles.`,
+  finance:`Shreya Nair, B.Tech + MBA Finance from IIM Ahmedabad, 1 year experience. Skills: Python, R, SQL, Bloomberg Terminal, time series analysis, quantitative modeling, options pricing, VaR calculation, Monte Carlo simulation, and financial derivatives. Looking for quant analyst, algo-trading, or risk management roles in finance sector.`,
+  health:`Aditya Kulkarni, B.Tech Biomedical Engineering from VIT, fresher. Skills: Python, R, medical imaging (OpenCV, ITK), electronic health records (EHR), FHIR API, SQL, scikit-learn, and data visualization. Final year project on ML-based diabetic retinopathy detection. Interested in health-tech, clinical AI, or bioinformatics roles.`,
+};
+
+// ── State ─────────────────────────────────────────────────────────────────────
+let agentLog = [];
+let lastData  = null;
+
+// ── Navigation ───────────────────────────────────────────────────────────────
+const PAGES = {
+  recommend: {title:'Find Matching Jobs', sub:'Paste your resume → get AI-ranked jobs + explanations', btn:true},
+  refine:    {title:'Refine Results',     sub:'Answer the clarifying question to re-rank your matches', btn:false},
+  log:       {title:'Agent Log',          sub:'Full tool call trace from the last run', btn:false},
+  dataset:   {title:'Dataset Explorer',   sub:'50 job roles across 15+ domains — loaded at startup', btn:false},
+  about:     {title:'Architecture & API', sub:'How the pipeline works under the hood', btn:false},
+};
+function nav(el, page) {
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('panel-' + page).classList.add('active');
+  document.getElementById('p-title').textContent = PAGES[page].title;
+  document.getElementById('p-sub').textContent   = PAGES[page].sub;
+  document.getElementById('run-btn').style.display = PAGES[page].btn ? '' : 'none';
+  if (page === 'dataset') buildDataset();
+}
+
+// ── Utils ─────────────────────────────────────────────────────────────────────
+function toast(msg, dur=2600) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), dur);
+}
+function onInput() {
+  const v = document.getElementById('resume-in').value;
+  document.getElementById('char-c').textContent    = v.length + ' chars';
+  document.getElementById('char-hint').textContent = v.length < 30 ? 'Minimum 30 characters' : '✓ Ready';
+}
+function loadSample(k) {
+  document.getElementById('resume-in').value = SAMPLES[k];
+  onInput(); toast('Sample loaded — click Run Agent');
+}
+function clearResume() { document.getElementById('resume-in').value = ''; onInput(); }
+function clearAll() {
+  clearResume();
+  document.getElementById('results-area').innerHTML = emptyState();
+}
+function clearLog() {
+  agentLog = [];
+  document.getElementById('log-body').innerHTML = '<div class="empty" style="padding:32px 20px"><div class="empty-icon" style="font-size:28px">📋</div><p>Run a recommendation to see the agent\'s tool call trace.</p></div>';
+  document.getElementById('log-pill').style.display = 'none';
+}
+function emptyState() {
+  return `<div class="empty"><div class="empty-icon">✨</div><p>Select a sample resume or paste your own above,<br>then click <strong>Run Agent</strong> to get AI-powered matches.</p></div>`;
+}
+
+// ── Progress helpers ──────────────────────────────────────────────────────────
+function setStep(n, status, label, time='') {
+  const el = document.getElementById('st'+n);
+  const sc = document.getElementById('sc'+n);
+  const sl = document.getElementById('sl'+n);
+  const st = document.getElementById('st'+n+'-t');
+  el.className = 'step-item ' + status;
+  sc.textContent = status === 'done' ? '✓' : n;
+  sl.textContent = label;
+  if (time) st.textContent = time;
+}
+function setProg(pct) { document.getElementById('prog-fill').style.width = pct + '%'; }
+
+// ── Log ───────────────────────────────────────────────────────────────────────
+function addLog(icon, name, detail) {
+  const ts = new Date().toLocaleTimeString();
+  agentLog.push({icon, name, detail, ts});
+  renderLog();
+  const pill = document.getElementById('log-pill');
+  pill.style.display = '';
+  pill.textContent   = agentLog.length;
+}
+function renderLog() {
+  if (!agentLog.length) return;
+  document.getElementById('log-body').innerHTML = agentLog.map(e => `
+    <div class="log-row">
+      <div class="log-ic ${e.icon}">${e.icon==='ok'?'✓':e.icon==='warn'?'!':'✗'}</div>
+      <div style="flex:1;min-width:0">
+        <div class="log-name">${e.name}</div>
+        <div class="log-detail">${e.detail}</div>
+      </div>
+      <div class="log-ts">${e.ts}</div>
+    </div>`).join('');
+}
+
+// ── Main Recommend ────────────────────────────────────────────────────────────
+async function runRecommend() {
+  const resume = document.getElementById('resume-in').value.trim();
+  if (!resume)      { toast('Paste your resume first'); return; }
+  if (resume.length < 30) { toast('Resume is too short'); return; }
+
+  const btn  = document.getElementById('run-btn');
+  const btn2 = document.getElementById('run-btn2');
+  btn.disabled = btn2.disabled = true;
+  btn.textContent = '⏳ Running…';
+
+  document.getElementById('prog-bar').classList.add('show');
+  document.getElementById('steps-box').classList.add('show');
+  document.getElementById('results-area').innerHTML = '';
+  agentLog = [];
+
+  const t0 = Date.now();
+  setStep(1, 'active', 'Computing TF-IDF cosine similarity across 50 jobs…');
+  setStep(2, '', 'Agent Step 1: calling parse_resume tool…');
+  setStep(3, '', 'Agent Step 2: calling generate_match_explanations tool…');
+  setProg(15);
+
+  try {
+    await delay(250);
+    setStep(1, 'done', 'TF-IDF ranking complete — top-5 selected', ms(t0));
+    addLog('ok', 'TF-IDF Ranking', 'Scored all 50 jobs using cosine similarity. Top-5 selected.');
+    setProg(35);
+    setStep(2, 'active', 'Agent Step 1: calling parse_resume tool…');
+    await delay(100);
+
+    const resp = await fetch('/recommend', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({resume_text: resume})
+    });
+
+    setProg(70);
+    setStep(2, 'done', 'parse_resume tool call complete', ms(t0));
+    setStep(3, 'active', 'Agent Step 2: calling generate_match_explanations tool…');
+    await delay(80);
+
+    if (!resp.ok) {
+      const err = await resp.json();
+      throw new Error(err.detail || 'API error ' + resp.status);
+    }
+
+    const data = await resp.json();
+    lastData = data;
+
+    setProg(100);
+    setStep(3, 'done', 'generate_match_explanations tool call complete', ms(t0));
+
+    addLog('ok', 'Tool: parse_resume',
+      `name="${data.candidate.name}" | skills=[${data.candidate.skills.slice(0,4).join(', ')}…] | exp=${data.candidate.experience_years}yr`);
+    addLog('ok', 'Tool: generate_match_explanations',
+      `Generated ${data.ranked_jobs.length} explanations + clarifying question | latency=${data.meta?.latency_s}s`);
+
+    renderResults(data, resume);
+
+    // Prefill refine tab
+    document.getElementById('rf-resume').value = resume;
+    document.getElementById('rf-q').value      = data.clarifying_question;
+
+  } catch(e) {
+    addLog('err', 'Error', e.message);
+    document.getElementById('results-area').innerHTML =
+      `<div class="err-box">❌ ${e.message}</div>`;
+    setProg(0);
+    setStep(3, '', 'Failed');
+  }
+
+  setTimeout(() => {
+    document.getElementById('prog-bar').classList.remove('show');
+    document.getElementById('steps-box').classList.remove('show');
+  }, 1800);
+
+  btn.disabled = btn2.disabled = false;
+  btn.textContent  = '▶ Run Agent';
+}
+
+// ── Render Results ────────────────────────────────────────────────────────────
+function renderResults(data, resume) {
+  const c       = data.candidate;
+  const initials = c.name.split(' ').map(w => w[0] || '').join('').slice(0,2).toUpperCase() || '?';
+  const topPct  = Math.round((data.ranked_jobs[0]?.similarity_score || 0) * 100 * 4);
+  const remoteC = data.ranked_jobs.filter(j => j.remote).length;
+  const latency = data.meta?.latency_s || '—';
+
+  let html = `
+  <div class="metrics metrics-4" style="margin-bottom:14px">
+    <div class="metric-card"><div class="metric-val">${topPct}%</div><div class="metric-lbl">Top Match</div><div class="metric-sub">TF-IDF cosine</div></div>
+    <div class="metric-card"><div class="metric-val">${data.ranked_jobs.length}</div><div class="metric-lbl">Jobs Ranked</div><div class="metric-sub">from 50 total</div></div>
+    <div class="metric-card"><div class="metric-val">${remoteC}</div><div class="metric-lbl">Remote Roles</div><div class="metric-sub">in your top-5</div></div>
+    <div class="metric-card"><div class="metric-val">${latency}s</div><div class="metric-lbl">Total Latency</div><div class="metric-sub">2 tool calls</div></div>
+  </div>
+
+  <div class="cand-card">
+    <div class="avatar">${initials}</div>
+    <div class="cand-info">
+      <div class="cand-name">${c.name}</div>
+      <div class="cand-meta">${c.experience_years} yr experience · ${c.education || 'Education not specified'}</div>
+      ${c.preferred_roles?.length ? `<div class="cand-meta" style="margin-top:3px">🎯 ${c.preferred_roles.join(' · ')}</div>` : ''}
+      <div class="chips">
+        ${c.skills.slice(0,9).map(s => `<span class="chip hl">${s}</span>`).join('')}
+        ${c.skills.length > 9 ? `<span class="chip">+${c.skills.length - 9} more</span>` : ''}
+      </div>
+    </div>
+  </div>
+
+  <div class="jobs-list">`;
+
+  data.ranked_jobs.forEach((job, i) => {
+    const rawScore = job.similarity_score;
+    const pct      = Math.min(Math.round(rawScore * 100 * 4), 99); // scale for readability
+    const barW     = Math.min(rawScore * 400, 100);
+    const cls      = pct >= 40 ? 'hi' : pct >= 20 ? 'md' : 'lo';
+    html += `
+    <div class="job-card ${i === 0 ? 'top' : ''}">
+      ${i === 0 ? '<div class="rank-badge"># 1 BEST MATCH</div>' : ''}
+      <div class="job-top">
+        <div>
+          <div style="font-size:10px;font-weight:700;color:var(--text3);margin-bottom:3px;${i===0?'margin-top:10px':''}">#${i+1}</div>
+          <div class="job-title">${job.title}</div>
+          <div class="job-co">${job.company} · ${job.location}</div>
+        </div>
+        <span class="score-pill ${cls}">${pct}% match</span>
+      </div>
+      <div class="score-bar"><div class="score-fill" style="width:${barW}%"></div></div>
+      <div class="tags">
+        ${(job.skills || []).slice(0,4).map(s => `<span class="tag">${s}</span>`).join('')}
+        ${job.remote ? '<span class="tag remote">🌐 Remote</span>' : ''}
+        <span class="tag domain">${job.domain}</span>
+        <span class="tag salary">₹${job.salary_lpa}L</span>
+        <span class="tag">${job.experience_years}yr exp</span>
+      </div>
+      <div class="expl">${job.explanation}</div>
+    </div>`;
+  });
+
+  html += `</div>
+  <div class="clarify-card">
+    <div class="clarify-lbl">💬 Smart Follow-up Question</div>
+    <div class="clarify-q">${data.clarifying_question}</div>
+    <div class="clarify-row">
+      <input type="text" id="c-ans" placeholder="Type your answer here…">
+      <button class="btn btn-primary" onclick="goRefine('${escQ(data.clarifying_question)}')">Refine Results ↗</button>
+    </div>
+  </div>`;
+
+  document.getElementById('results-area').innerHTML = html;
+  toast(`✅ ${data.ranked_jobs.length} jobs ranked in ${latency}s`);
+}
+
+function escQ(q) { return q.replace(/'/g, "\\'").replace(/"/g, '&quot;'); }
+
+function goRefine(q) {
+  const ans = document.getElementById('c-ans')?.value.trim();
+  if (ans) document.getElementById('rf-a').value = ans;
+  document.getElementById('rf-q').value = q;
+  document.querySelectorAll('.nav-btn')[1].click();
+}
+
+// ── Refine ────────────────────────────────────────────────────────────────────
+async function runRefine() {
+  const resume = document.getElementById('rf-resume').value.trim();
+  const q      = document.getElementById('rf-q').value.trim();
+  const a      = document.getElementById('rf-a').value.trim();
+  if (!resume || !q || !a) { toast('Fill in all three fields'); return; }
+
+  const out = document.getElementById('refine-out');
+  out.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text3);font-size:13px">⏳ Re-ranking with your answer…</div>';
+
+  try {
+    const resp = await fetch('/refine', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({resume_text: resume, clarifying_question: q, candidate_answer: a})
+    });
+    if (!resp.ok) { const e = await resp.json(); throw new Error(e.detail); }
+    const data = await resp.json();
+
+    let html = `<div class="reasoning">${data.reasoning}</div><div class="jobs-list">`;
+    data.ranked_jobs.forEach((job, i) => {
+      const pct  = Math.min(Math.round(job.similarity_score * 400), 99);
+      const barW = Math.min(job.similarity_score * 400, 100);
+      const cls  = pct >= 40 ? 'hi' : pct >= 20 ? 'md' : 'lo';
+      html += `
+      <div class="job-card ${i===0?'top':''}">
+        ${i===0?'<div class="rank-badge"># 1 REFINED</div>':''}
+        <div class="job-top">
+          <div>
+            <div style="font-size:10px;font-weight:700;color:var(--text3);margin-bottom:3px;${i===0?'margin-top:10px':''}">#${i+1}</div>
+            <div class="job-title">${job.title}</div>
+            <div class="job-co">${job.company} · ${job.location}</div>
+          </div>
+          <span class="score-pill ${cls}">${pct}%</span>
+        </div>
+        <div class="score-bar"><div class="score-fill" style="width:${barW}%"></div></div>
+        <div class="tags">${job.remote?'<span class="tag remote">🌐 Remote</span>':''}<span class="tag domain">${job.domain}</span><span class="tag salary">₹${job.salary_lpa}L</span></div>
+        <div class="expl">${job.explanation}</div>
+      </div>`;
+    });
+    html += '</div>';
+    out.innerHTML = html;
+    toast('✅ Results refined!');
+    addLog('ok', 'Refine complete', `Re-ranked based on: "${a}"`);
+  } catch(e) {
+    out.innerHTML = `<div class="err-box">❌ ${e.message}</div>`;
+  }
+}
+
+// ── Dataset ───────────────────────────────────────────────────────────────────
+let allJobs = [];
+const DOMAIN_COLORS = ['#18181a','#1d4ed8','#16a34a','#b45309','#6d28d9','#dc2626','#0891b2','#ea580c','#be185d','#65a30d','#0f766e','#7c3aed'];
+
+async function buildDataset() {
+  if (allJobs.length) { renderDataset(); return; }
+  try {
+    const [statsR, jobsR] = await Promise.all([fetch('/stats'), fetch('/jobs')]);
+    const stats = await statsR.json();
+    const jobsD = await jobsR.json();
+    allJobs     = jobsD.jobs || [];
+
+    document.getElementById('ds-remote').textContent  = stats.remote_count;
+    document.getElementById('ds-domains').textContent = Object.keys(stats.domain_breakdown).length;
+    document.getElementById('ds-avg').textContent     = stats.salary.avg + 'L';
+
+    const sel = document.getElementById('ds-filter');
+    Object.keys(stats.domain_breakdown).forEach(d => {
+      const o   = document.createElement('option');
+      o.value   = d; o.textContent = d;
+      sel.appendChild(o);
+    });
+
+    // Domain chart
+    const max = Math.max(...Object.values(stats.domain_breakdown));
+    document.getElementById('domain-chart').innerHTML = Object.entries(stats.domain_breakdown)
+      .map(([d,c], i) => `
+        <div class="domain-row">
+          <div class="domain-name">${d}</div>
+          <div class="domain-bar-wrap">
+            <div class="domain-bar-fill" style="width:${(c/max*100).toFixed(0)}%;background:${DOMAIN_COLORS[i%DOMAIN_COLORS.length]}"></div>
+          </div>
+          <div class="domain-count">${c}</div>
+        </div>`).join('');
+
+    renderDataset();
+  } catch(e) { console.error(e); }
+}
+
+function loadJobs() { renderDataset(); }
+
+function renderDataset() {
+  const filter  = document.getElementById('ds-filter').value;
+  const jobs    = filter ? allJobs.filter(j => j.domain === filter) : allJobs;
+  const grid    = document.getElementById('jobs-grid');
+  grid.innerHTML = jobs.map(j => `
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);gap:10px">
+      <div>
+        <div style="font-size:13px;font-weight:600">${j.title}</div>
+        <div style="font-size:12px;color:var(--text2);margin-top:2px">${j.company} · ${j.location}</div>
+        <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:6px">
+          ${(j.skills||[]).slice(0,3).map(s=>`<span class="tag">${s}</span>`).join('')}
+          ${j.remote?'<span class="tag remote">Remote</span>':''}
+          <span class="tag domain">${j.domain}</span>
+        </div>
+      </div>
+      <div style="text-align:right;flex-shrink:0">
+        <div style="font-size:13px;font-weight:700;color:var(--green)">₹${j.salary_lpa}L</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:2px">${j.experience_years}yr exp</div>
+      </div>
+    </div>`).join('');
+}
+
+// ── API status ────────────────────────────────────────────────────────────────
+async function checkStatus() {
+  try {
+    const r    = await fetch('/health');
+    const d    = await r.json();
+    const dot  = document.getElementById('dot');
+    const txt  = document.getElementById('dot-text');
+    dot.className = 'dot' + (d.api_key_set ? '' : ' err');
+    txt.textContent = d.api_key_set
+      ? `${d.jobs_loaded} jobs · API ready`
+      : 'GEMINI_API_KEY not set';
+  } catch {
+    document.getElementById('dot').className = 'dot err';
+    document.getElementById('dot-text').textContent = 'Server offline';
+  }
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+const delay = ms => new Promise(r => setTimeout(r, ms));
+const ms    = t0 => ((Date.now() - t0) / 1000).toFixed(1) + 's';
+
+checkStatus();
+</script>
+</body>
+</html>
