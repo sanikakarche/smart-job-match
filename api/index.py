@@ -12,6 +12,7 @@ Embed: TF-IDF (zero latency, no external API, good spread on 50 jobs)
 
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 import os
@@ -47,6 +48,33 @@ app.add_middleware(
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 GEMINI_MODEL   = "gemini-2.5-flash-lite"
 TOP_N          = 5
+# ─── In-memory cache ─────────────────────────────────────────────────────────
+# Caches Gemini responses by (resume_hash, type) — survives within one
+# Vercel function instance (warm requests). Saves quota + cuts latency ~6s.
+
+_cache: dict[str, dict] = {}   # key → {candidate, ranked_jobs, clarifying_q, ts}
+_CACHE_TTL = 3600              # 1 hour
+
+def _cache_key(text: str, prefix: str = "rec") -> str:
+    h = hashlib.sha256(text.strip().lower().encode()).hexdigest()[:16]
+    return f"{prefix}:{h}"
+
+def _cache_get(key: str) -> dict | None:
+    entry = _cache.get(key)
+    if entry and (time.time() - entry["ts"]) < _CACHE_TTL:
+        return entry
+    if entry:
+        del _cache[key]   # expired
+    return None
+
+def _cache_set(key: str, data: dict) -> None:
+    # Keep cache bounded — evict oldest if >200 entries
+    if len(_cache) >= 200:
+        oldest = min(_cache, key=lambda k: _cache[k]["ts"])
+        del _cache[oldest]
+    _cache[key] = {**data, "ts": time.time()}
+
+
 
 # ─── Load jobs at startup ────────────────────────────────────────────────────
 
@@ -408,20 +436,84 @@ async def serve_ui():
 
 @app.get("/health")
 async def health():
+    now   = time.time()
+    alive = sum(1 for e in _cache.values() if (now - e["ts"]) < _CACHE_TTL)
     return {
-        "status":         "ok",
-        "jobs_loaded":    len(JOBS),
-        "model":          GEMINI_MODEL,
-        "api_key_set":    bool(GEMINI_API_KEY),
-        "tfidf_vocab":    len(IDF_MAP),
+        "status":       "ok",
+        "jobs_loaded":  len(JOBS),
+        "model":        GEMINI_MODEL,
+        "api_key_set":  bool(GEMINI_API_KEY),
+        "tfidf_vocab":  len(IDF_MAP),
+        "cache_entries": alive,
     }
+
+
+@app.get("/cache/stats")
+async def cache_stats():
+    """Shows live cache state — useful for demos."""
+    now     = time.time()
+    entries = []
+    for k, v in _cache.items():
+        age = round(now - v["ts"], 1)
+        if age < _CACHE_TTL:
+            entries.append({
+                "key":        k,
+                "age_seconds": age,
+                "expires_in":  round(_CACHE_TTL - age, 1),
+                "candidate":  v.get("candidate", {}).get("name", "?"),
+            })
+    return {
+        "total_entries": len(entries),
+        "ttl_seconds":   _CACHE_TTL,
+        "entries":       entries,
+    }
+
+
+@app.delete("/cache/clear")
+async def cache_clear():
+    """Clears all cached responses."""
+    count = len(_cache)
+    _cache.clear()
+    return {"cleared": count, "message": f"Removed {count} cached entries."}
 
 
 @app.post("/recommend")
 async def recommend(req: RecommendRequest):
-    t0       = time.time()
+    t0      = time.time()
+    ckey    = _cache_key(req.resume_text, "rec")
+    cached  = _cache_get(ckey)
+
+    if cached:
+        # Cache hit — skip Gemini calls entirely
+        return {
+            "candidate":          cached["candidate"],
+            "ranked_jobs":        cached["ranked_jobs"],
+            "clarifying_question": cached["clarifying_q"],
+            "meta": {
+                "model":          GEMINI_MODEL,
+                "ranking_method": "TF-IDF cosine similarity",
+                "jobs_scored":    len(JOBS),
+                "top_n":          TOP_N,
+                "latency_s":      round(time.time() - t0, 4),
+                "cache":          "HIT",
+            },
+        }
+
     top_jobs = rank_jobs(req.resume_text, n=TOP_N)
     candidate, ranked_jobs, clarifying_q = await run_agent(req.resume_text, top_jobs)
+
+    # Store in cache
+    _cache_set(ckey, {
+        "candidate":   {
+            "name":             candidate.get("name", "Unknown"),
+            "skills":           candidate.get("skills", []),
+            "experience_years": candidate.get("experience_years", 0),
+            "preferred_roles":  candidate.get("preferred_roles", []),
+            "education":        candidate.get("education", ""),
+        },
+        "ranked_jobs":  ranked_jobs,
+        "clarifying_q": clarifying_q,
+    })
 
     return {
         "candidate": {
@@ -439,6 +531,7 @@ async def recommend(req: RecommendRequest):
             "jobs_scored":    len(JOBS),
             "top_n":          TOP_N,
             "latency_s":      round(time.time() - t0, 2),
+            "cache":          "MISS",
         },
     }
 
